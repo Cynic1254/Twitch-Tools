@@ -1,26 +1,19 @@
 // @ts-check
-const app = require("./ServerApp/App");
-const fileSystem = require("fs");
 const path = require("path");
+const app = require("./tools/Server");
 
-const serverApp = new app.Server();
+const serverApp = new app.Server("localhost", 3000);
+const defaultDomain = serverApp.DefaultDomain();
 
-serverApp.routes.set("/HelloWorld", (req, res) => {
-    fileSystem.readFile(
-        path.join(__dirname, "HelloWorld.html"),
-        (err, data) => {
-            if (err) {
-                console.log(err.message);
-                res.statusCode = 500;
-                res.setHeader("Content-Type", "text/plain");
-                res.end("Server Error");
-            } else {
-                res.statusCode = 200;
-                res.setHeader("Content-Type", "text/html");
-                res.end(data);
-            }
-        }
-    );
-});
+defaultDomain.routes.Insert(
+    new Array(),
+    app.ServeFile(path.join(__dirname, "/HelloWorld.html"))
+);
+defaultDomain.routes.Insert(
+    new Array("favicon.ico"),
+    app.ServeFile(path.join(__dirname, "assets/images/favicon.ico"))
+);
 
-serverApp.Start(3000, () => {});
+defaultDomain.routes.PrintTree("root");
+
+serverApp.Start(() => {});
