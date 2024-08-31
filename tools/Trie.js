@@ -10,6 +10,7 @@ class Trie {
      *
      * @param {string[]} segments path of the new action
      * @param {T} action action to execute at path end
+     * @returns {Trie<T>} the node the action got added to
      */
     Insert(segments, action) {
         let node = this;
@@ -23,6 +24,7 @@ class Trie {
         }
 
         node.#action = action;
+        return node;
     }
 
     /**
@@ -53,10 +55,10 @@ class Trie {
      * @param {boolean} allowFallback Should the fallback be used if the current segment can't be found in the node? this allows path that look like this: \/\<node name>\/*\/\<node name>
      * @returns {InstanceType<Trie<T>['ResponseObject']>}
      */
-    Find(segments, allowFallback = true) {
-        console.log(
-            `attempting to find node at: ${segments}, with ${segments.length} segments`
-        );
+    Find(segments, allowFallback = true, returnLastValid = false) {
+        // console.log(
+        //     `attempting to find node at: ${segments}, with ${segments.length} segments`
+        // );
 
         /**
          * @type {Trie<T>}
@@ -66,14 +68,15 @@ class Trie {
          * @type {String[]}
          */
         let foundPath = new Array();
-        let restPath = segments;
+        let restPath = [...segments];
 
         for (const segment of segments) {
+            // console.log(`looking for segment: ${segment}`);
             if (!node.#children.get(segment)) {
                 if (allowFallback && node.fallback) {
-                    console.log(
-                        `couldn't find segment: ${segment}, using fallback...`
-                    );
+                    // console.log(
+                    //     `couldn't find segment: ${segment}, using fallback...`
+                    // );
 
                     foundPath.push(segment);
                     restPath.shift();
@@ -81,10 +84,10 @@ class Trie {
                     node = node.fallback;
                     continue;
                 }
-                if (this.mayFailHere) {
-                    console.log(
-                        `path ended, but may fail here so returning current node with segment: ${segment}`
-                    );
+                if (node.mayFailHere || returnLastValid) {
+                    // console.log(
+                    //     `path ended, but may fail here so returning current node with segment: ${segment}`
+                    // );
                     return new this.ResponseObject(
                         true,
                         foundPath,
@@ -93,18 +96,22 @@ class Trie {
                     );
                 }
 
-                console.log(`No path found returning empty ResponseObject`);
+                // console.log(
+                //     `No path found returning empty ResponseObject, MayFailHere was: ${node.mayFailHere}, path was: ${segments}`
+                // );
                 return new this.ResponseObject();
             }
 
             foundPath.push(segment);
             restPath.shift();
 
+            // console.log(`found segment: ${segment}, accessing...`);
+
             // @ts-ignore
             node = node.#children.get(segment);
         }
 
-        console.log(`found path, returning ResponseObject`);
+        // console.log(`found path, returning ResponseObject`);
         return new this.ResponseObject(true, foundPath, node.#action, restPath);
     }
 

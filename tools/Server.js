@@ -63,13 +63,25 @@ class FileServer extends Subdomain {
     /**
      * @type {Trie<String>}
      */
-    allowedPaths = new Trie();
+    #allowedPaths = new Trie();
+
+    /**
+     *
+     * @param {String[]} Segments
+     * @param {String} Path
+     */
+    AddNewPath(Segments, Path) {
+        const node = this.#allowedPaths.Insert(Segments, Path);
+        node.mayFailHere = true;
+    }
 
     /**
      * @param {http.IncomingMessage} req
      * @param {http.ServerResponse} res
      */
     HandleCall(req, res) {
+        console.log(`fileServerRunning`);
+
         if (!req.url) {
             console.log(`No URL provided`);
 
@@ -83,7 +95,7 @@ class FileServer extends Subdomain {
         const parsedURL = new URL(req.url, `http://${req.headers.host}`);
         console.log(`finding path: ${parsedURL.pathname}...`);
 
-        let result = this.allowedPaths.Find(
+        let result = this.#allowedPaths.Find(
             parsedURL.pathname.split("/").filter(Boolean)
         );
 
@@ -129,17 +141,14 @@ class FileServer extends Subdomain {
             return;
         }
 
-        if (filePath.replace(/\\/g, "/").startsWith(result.response)) {
+        if (filePath.startsWith(result.response)) {
             console.log(`found file, serving ${filePath}...`);
             ServeFile(filePath)(req, res);
             return;
         }
 
         console.log(
-            `file pointed outside of allowed folder, path is ${filePath.replace(
-                /\\/g,
-                "/"
-            )}, allowed path is ${result.response}, ignoring...`
+            `file pointed outside of allowed folder, path is ${filePath}, allowed path is ${result.response}, ignoring...`
         );
         // Handle 404 Not Found
         res.statusCode = 403;
@@ -217,7 +226,7 @@ class Server {
             return;
         }
 
-        console.log(`handling request at: ${req.url}`);
+        console.log(`handling request at: ${req.headers.host}${req.url}`);
 
         let host = req.headers.host;
 
@@ -296,9 +305,9 @@ function ServeFile(AbsolutePath, contentType = null) {
         }
     }
 
-    console.log(
-        `registering new callback for file: ${AbsolutePath}, with fileType" ${Type}`
-    );
+    // console.log(
+    //     `registering new callback for file: ${AbsolutePath}, with fileType" ${Type}`
+    // );
 
     /**
      * @param {http.IncomingMessage} req
@@ -327,6 +336,7 @@ function ServeFile(AbsolutePath, contentType = null) {
 /**
  *
  * @param {Server} Server server to get subdomains from
+ * @param {string} [path="/"] the path the request uses
  * @returns Response
  */
 function RedirectSubdomain(Server, path = "/") {
@@ -351,12 +361,19 @@ function RedirectSubdomain(Server, path = "/") {
             return;
         }
 
-        let url = new URL(req.url);
+        console.log(`Redirect url: ${req.url}`);
+        let url = new URL(`http://${req.headers.host}${req.url}`);
+        console.log(`pathname: ${url.pathname}`);
         let host = url.pathname.slice(path.length).split("/");
 
-        let result = Server.subdomains.Find(host);
+        let result = Server.subdomains.Find(host, true, true);
 
-        if (result) {
+        if (result.valid) {
+            // @ts-ignore
+            req.url = "/" + result.restPath.join("/") + url.search + url.hash;
+
+            console.log(`constructed new url: ${req.url}`);
+
             // @ts-ignore
             result.response.HandleCall(req, res);
             return;
