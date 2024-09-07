@@ -10,7 +10,16 @@ const http = require("http");
  */
 
 class Subdomain {
-    constructor() {}
+    /**
+     *
+     * @param {Server} server
+     */
+    constructor(server) {
+        this.routes.Insert(
+            Array("SubdomainRedirect"),
+            RedirectSubdomain(server, "/SubdomainRedirect/")
+        ).mayFailHere = true;
+    }
 
     /**
      * @type {Trie<Response>}
@@ -56,8 +65,11 @@ class Subdomain {
 }
 
 class FileServer extends Subdomain {
-    constructor() {
-        super();
+    /**
+     * @param {Server} server
+     */
+    constructor(server) {
+        super(server);
     }
 
     /**
@@ -80,8 +92,6 @@ class FileServer extends Subdomain {
      * @param {http.ServerResponse} res
      */
     HandleCall(req, res) {
-        console.log(`fileServerRunning`);
-
         if (!req.url) {
             console.log(`No URL provided`);
 
@@ -169,7 +179,7 @@ class Server {
 
         // assign loopback at root of trie so we can just ignore different rootDomain formats
         this.subdomains.fallback = this.subdomains;
-        this.subdomains.Insert(new Array(), new Subdomain());
+        this.subdomains.Insert(new Array(), new Subdomain(this));
 
         this.#server.on("error", (err) => {
             console.error(`error occured: ${err.name}, ${err.message}`);
@@ -242,6 +252,8 @@ class Server {
         let result = this.subdomains.Find(domains);
 
         if (result.valid) {
+            // console.log(`found match at: ${result.foundPath}`);
+
             // @ts-ignore
             result.response.HandleCall(req, res);
             return;
@@ -299,9 +311,9 @@ function ServeFile(AbsolutePath, contentType = null) {
                 Type = "image/svg+xml";
                 break;
             default:
-                throw new Error(
-                    `Can't infer filetype from ${AbsolutePath}, found: ${fileExt}...`
-                );
+                console.log(`couldn't infer filetype assuming plaintext...`);
+                Type = "text/plain";
+                break;
         }
     }
 
@@ -336,7 +348,7 @@ function ServeFile(AbsolutePath, contentType = null) {
 /**
  *
  * @param {Server} Server server to get subdomains from
- * @param {string} [path="/"] the path the request uses
+ * @param {string} path the path the request uses
  * @returns Response
  */
 function RedirectSubdomain(Server, path = "/") {
