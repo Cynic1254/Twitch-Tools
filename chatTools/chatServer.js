@@ -14,6 +14,11 @@ class ChatServer extends app.Subdomain {
             Array("assets", "chatLocal"),
             app.ServeFile(path.join(__dirname, "./assets/chatLocal.js"))
         );
+
+        this.routes.Insert(
+            Array("assets", "websockets"),
+            app.ServeFile(path.join(__dirname, "./assets/Websockets.js"))
+        );
     }
 }
 
