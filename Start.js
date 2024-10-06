@@ -23,6 +23,6 @@ serverApp.subdomains.Insert(Array("file"), FileDomain);
 
 const chatDomain = new chat.ChatServer(serverApp);
 
-serverApp.subdomains.Insert(Array("chat"), chatDomain);
+serverApp.subdomains.Insert(Array(), chatDomain);
 
 serverApp.Start(() => {});
