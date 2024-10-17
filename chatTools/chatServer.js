@@ -24,6 +24,11 @@ class ChatServer extends app.Subdomain {
             Array("assets", "OAuth"),
             app.ServeFile(path.join(__dirname, "./assets/OAuth.js"))
         );
+
+        this.routes.Insert(
+            Array("assets", "Badges"),
+            app.ServeFile(path.join(__dirname, "./assets/Badges.js"))
+        );
     }
 }
 

@@ -5,15 +5,18 @@ import { TwitchAuth } from "./OAuth";
 export class TwitchSocket {
     /**
      * @param {TwitchAuth} token
+     * @param {String} clientID
      */
-    constructor(token) {
+    constructor(token, clientID) {
+        this.#client_id = clientID;
         this.#websocket = new WebSocket("wss://eventsub.wss.twitch.tv/ws");
 
         this.#session_id = new Promise((resolve, reject) => {
             this.#promise_resolve = resolve;
         });
 
-        this.#websocket.onmessage = this.#OnMessage;
+        this.#websocket.onmessage = this.#OnMessage.bind(this);
+        this.#websocket.onclose = this.#OnClose.bind(this);
 
         this.token = token;
     }
@@ -22,10 +25,11 @@ export class TwitchSocket {
      * @param {string | URL} ReconnectURL
      */
     Reconnect(ReconnectURL) {
+        console.log("message timeout, reconnecting...");
         this.#oldSocket = this.#websocket;
         this.#websocket = new WebSocket(ReconnectURL);
-        this.#websocket.onmessage = this.#OnMessage;
-        this.#websocket.onclose = this.#OnClose;
+        this.#websocket.onmessage = this.#OnMessage.bind(this);
+        this.#websocket.onclose = this.#OnClose.bind(this);
     }
 
     /**
@@ -33,8 +37,9 @@ export class TwitchSocket {
      */
     #ResetTimeout(newTime) {
         clearTimeout(this.#timeOutId);
+        // @ts-ignore
         this.#timeOutId = setTimeout(
-            this.Reconnect,
+            this.Reconnect.bind(this),
             newTime,
             "wss://eventsub.wss.twitch.tv/ws"
         );
@@ -69,10 +74,14 @@ export class TwitchSocket {
                 case "session_welcome":
                     this.#promise_resolve(message.payload.session.id);
                     this.keepalive_timeout =
-                        message.payload.session.keepalive_timeout_seconds *
+                        (message.payload.session.keepalive_timeout_seconds +
+                            5) *
                         1000;
 
                     if (this.#oldSocket != null) {
+                        console.log(
+                            "Received session welcome... closing old socket..."
+                        );
                         this.#oldSocket.close();
                     }
 
@@ -115,6 +124,8 @@ export class TwitchSocket {
         console.log(
             `Connection closed with reason: ${event.reason}, Code: ${event.code}`
         );
+
+        clearTimeout(this.#timeOutId);
     }
 
     /**
@@ -146,12 +157,11 @@ export class TwitchSocket {
                     }),
                 }).then(async (response) => {
                     if (response.status == 202) {
-                        this.#events.set(
-                            (await response.json()).data[0].id,
-                            callback
-                        );
+                        var id = (await response.json()).data[0].id;
 
-                        resolve((await response.json()).data[0].id);
+                        this.#events.set(id, callback);
+
+                        resolve(id);
                         return;
                     }
 
@@ -225,10 +235,10 @@ export class TwitchSocket {
     /**
      * @type {Map<string, (arg0: object) => void>}
      */
-    #events;
+    #events = new Map();
 
     /**
      * @type {Set<string>}
      */
-    #messages;
+    #messages = new Set();
 }
