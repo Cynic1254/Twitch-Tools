@@ -1,10 +1,13 @@
-import { TwitchAuth } from "./OAuth";
-import { TwitchSocket } from "./Websockets";
-import { Badges, Badge } from "./Badges";
+//@ts-check
 
-const token = "fipq3q036ooy0les1ab2nvung6g9ya";
+import { TwitchAuth } from "./OAuth.js";
+import { TwitchSocket } from "./Websockets.js";
+import { Badges, Badge } from "./Badges.js";
+import { ChatMessage } from "./message.js";
+import * as Global from "./globals.js";
+
 const auth = new TwitchAuth(
-    token,
+    Global.token,
     new Set(["user:read:chat"]),
     window.location.href
 );
@@ -27,14 +30,19 @@ function CreateChatter(object, element, badges) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const websocket = new TwitchSocket(auth, token);
+    const websocket = new TwitchSocket(
+        auth,
+        Global.token,
+        Global.websocket_url,
+        Global.eventsub_url
+    );
 
     const userID = new Promise(async (resolve, reject) => {
-        fetch("https://api.twitch.tv/helix/users", {
+        fetch(`${Global.api_url}/users`, {
             method: "GET",
             headers: {
                 Authorization: `Bearer ${await websocket.token.GetAccessToken()}`,
-                "Client-Id": token,
+                "Client-Id": Global.token,
                 "Content-Type": "application/json",
             },
         })
@@ -47,7 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
     });
 
-    var badges = new Badges(await userID, auth, token);
+    var badges = new Badges(await userID, auth, Global.token);
 
     websocket.SubscribeToEvent(
         "channel.chat.message",
@@ -56,7 +64,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         (object) => {
             var chatElement = document.getElementById("chat");
 
-            if (chatElement) {
+            if (chatElement && chatElement instanceof HTMLTableElement) {
                 var row = chatElement.insertRow(-1);
                 row.id = object.message_id;
                 row.classList.add("ChatMessage");
@@ -65,7 +73,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 CreateChatter(object, row.insertCell(-1), badges);
 
                 var messageCell = row.insertCell(-1);
-                messageCell.innerText = object.message.text;
+                messageCell.appendChild(new ChatMessage(object, auth).ToDiv());
                 messageCell.classList.add("Message");
             }
         }

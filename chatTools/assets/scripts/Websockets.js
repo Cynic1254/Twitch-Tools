@@ -1,15 +1,23 @@
 //@ts-check
 
-import { TwitchAuth } from "./OAuth";
+import { TwitchAuth } from "./OAuth.js";
 
 export class TwitchSocket {
     /**
      * @param {TwitchAuth} token
      * @param {String} clientID
      */
-    constructor(token, clientID) {
+    constructor(
+        token,
+        clientID,
+        websocket_url = "wss://eventsub.wss.twitch.tv/ws",
+        eventsub_url = "https://api.twitch.tv/helix/eventsub/subscriptions"
+    ) {
+        this.#websocket_url_endpoint = websocket_url;
+        this.#eventsub_url_endpoint = eventsub_url;
+
         this.#client_id = clientID;
-        this.#websocket = new WebSocket("wss://eventsub.wss.twitch.tv/ws");
+        this.#websocket = new WebSocket(this.#websocket_url_endpoint);
 
         this.#session_id = new Promise((resolve, reject) => {
             this.#promise_resolve = resolve;
@@ -41,7 +49,7 @@ export class TwitchSocket {
         this.#timeOutId = setTimeout(
             this.Reconnect.bind(this),
             newTime,
-            "wss://eventsub.wss.twitch.tv/ws"
+            this.#websocket_url_endpoint
         );
     }
 
@@ -139,7 +147,7 @@ export class TwitchSocket {
     async SubscribeToEvent(event, version, options, callback) {
         return new Promise((resolve, reject) => {
             this.#session_id.then(async (session_id_in) => {
-                fetch("https://api.twitch.tv/helix/eventsub/subscriptions", {
+                fetch(this.#eventsub_url_endpoint, {
                     method: "POST",
                     headers: {
                         Authorization: `Bearer ${await this.token.GetAccessToken()}`,
@@ -179,17 +187,14 @@ export class TwitchSocket {
      * @param {string} event_id
      */
     async DeleteEvent(event_id) {
-        fetch(
-            `https://api.twitch.tv/helix/eventsub/subscriptions?id=${event_id}`,
-            {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${await this.token.GetAccessToken()}`,
-                    "Client-Id": this.#client_id,
-                    "Content-Type": "application/json",
-                },
-            }
-        ).then((response) => {
+        fetch(`${this.#eventsub_url_endpoint}?id=${event_id}`, {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${await this.token.GetAccessToken()}`,
+                "Client-Id": this.#client_id,
+                "Content-Type": "application/json",
+            },
+        }).then((response) => {
             if (response.status != 204) {
                 console.error(
                     "Creating subscription failed: ",
@@ -241,4 +246,14 @@ export class TwitchSocket {
      * @type {Set<string>}
      */
     #messages = new Set();
+
+    /**
+     * @type {String}
+     */
+    #websocket_url_endpoint = "wss://eventsub.wss.twitch.tv/ws";
+    /**
+     * @type {String}
+     */
+    #eventsub_url_endpoint =
+        "https://api.twitch.tv/helix/eventsub/subscriptions";
 }

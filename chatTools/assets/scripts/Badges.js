@@ -1,6 +1,6 @@
 //@ts-check
 
-import { TwitchAuth } from "./OAuth";
+import { TwitchAuth } from "./OAuth.js";
 
 export class Badge {
     /**
